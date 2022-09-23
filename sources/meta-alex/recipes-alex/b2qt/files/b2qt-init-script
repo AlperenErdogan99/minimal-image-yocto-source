@@ -1,0 +1,86 @@
+#! /bin/sh
+# Author: Alperen Erdogan <falperenerdogan998@gmail.com>
+PATH=/sbin:/usr/sbin:/bin:/usr/bin:/opt/qt-simple-calc
+DESC="Start qt simple calculator application"
+NAME=simpleCalculator
+DAEMON=/opt/qt-simple-calc/$NAME
+DAEMON_ARGS=""
+PIDFILE=/var/run/$NAME.pid
+SCRIPTNAME=/etc/init.d/$NAME
+
+# define eglfs configuration variables for qt application
+export QT_QPA_PLATFORM="eglfs"
+export XDG_RUNTIME_DIR="/var/volatile/runtime-root"
+export QT_QPA_EGLFS_INTEGRATION="eglfs_kms"
+
+# Exit if the package is not installed
+[ -x "$DAEMON" ] || exit 0
+
+# Read configuration variable file if it is present
+[ -r /etc/default/$NAME ] && . /etc/default/$NAME
+
+do_start()
+{
+        start-stop-daemon --start --quiet --background --make-pidfile --pidfile $PIDFILE --exec $DAEMON --test > /dev/null \
+                || return 1
+}
+
+do_stop()
+{
+        start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --pidfile $PIDFILE --name $NAME
+        RETVAL="$?"
+        [ "$RETVAL" = 2 ] && return 2
+        start-stop-daemon --stop --quiet --oknodo --retry=0/30/KILL/5 --exec $DAEMON
+        [ "$?" = 2 ] && return 2
+        rm -f $PIDFILE
+        return "$RETVAL"
+}
+
+do_reload() {
+        start-stop-daemon --stop --signal 1 --quiet --pidfile $PIDFILE --name $NAME
+        return 0
+}
+
+case "$1" in
+  start)
+        do_start
+        case "$?" in
+                2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
+        esac
+        ;;
+  stop)
+        do_stop
+        case "$?" in
+                2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
+        esac
+        ;;
+  status)
+        status_of_proc "$DAEMON" "$NAME" && exit 0 || exit $?
+        ;;
+  restart|force-reload)
+        log_daemon_msg "Restarting $DESC" "$NAME"
+        do_stop
+        case "$?" in
+          0|1)
+                do_start
+                case "$?" in
+                        0) log_end_msg 0 ;;
+                        1) log_end_msg 1 ;; # Old process is still running
+                        *) log_end_msg 1 ;; # Failed to start
+                esac
+                ;;
+          *)
+            	# Failed to stop
+                log_end_msg 1
+                ;;
+        esac
+	;;
+  *)
+        #echo "Usage: $SCRIPTNAME {start|stop|restart|reload|force-reload}" >&2
+        echo "Usage: $SCRIPTNAME {start|stop|status|restart|force-reload}" >&2
+        exit 3
+	;;
+esac
+
+:
+
